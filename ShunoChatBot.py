@@ -9,8 +9,3 @@ st.set_page_config(
     layout = "wide"
 )
 
-left, mid, right = st.columns([1, 2, 1])
-
-with mid:
-    loading_bar = st.progress(0)
-    
