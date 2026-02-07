@@ -224,8 +224,7 @@ async def start_agent_streaming(agent_executor, chat_history, user_input) -> str
             full_response = ""
             container = st.empty()
             async for event in agent_executor.astream_events(
-                {"input": user_input},
-                {"chat_history": chat_history},
+                {"input": user_input, "chat_history": chat_history},
                 version="v2"
             ):
                 kind = event["event"]
@@ -254,7 +253,8 @@ async def start_agent_streaming(agent_executor, chat_history, user_input) -> str
                         name = "게시판 등록 완료"
                     status.write(f"✅ {name}!")
                 elif kind == "on_chat_model_stream":
-                    status.update(label="에이전트가 답변을 생성하는 중...", state="running")
+                    if not full_response:
+                        status.update(label="에이전트가 답변을 생성하는 중...", state="running")
                     content = event["data"]["chunk"].content
                     if content:
                         full_response += content
@@ -275,10 +275,10 @@ if user_input:
 
     with st.chat_message("assistant"):
         try:
-            full_response = asyncio.run(start_agent_streaming(agent_executor, prompt))
+            full_response = asyncio.run(start_agent_streaming(agent_executor, st.session_state.chat_history, user_input))
         except RuntimeError:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            full_response = loop.run_until_complete(start_agent_streaming(agent_executor, prompt))
+            full_response = loop.run_until_complete(start_agent_streaming(agent_executor, st.session_state.chat_history, user_input))
     
     st.session_state.chat_history.append(AIMessage(full_response))
