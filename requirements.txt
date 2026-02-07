@@ -1,4 +1,4 @@
-streamlit
+streamlit_cookies_manager
 langchain>=0.2.0
 langchain-classic
 langchain-openai>=0.1.0

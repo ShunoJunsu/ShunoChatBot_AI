@@ -1,6 +1,7 @@
 import streamlit as st
 import requests
-import datetime
+from streamlit_cookies_manager import EncryptedCookieManager
+from datetime import datetime, timedelta
 import os
 import urllib3
 import asyncio
@@ -18,8 +19,19 @@ st.set_page_config(
     layout="wide"
 )
 
+cookies = EncryptedCookieManager(
+    prefix="myapp_",
+    password="ShunoChatBot_IM4U1234!"
+)
+
+if not cookies.ready():
+    st.rerun()
+
 if not "already_displayed_complete_login" in st.session_state:
     st.session_state.already_displayed_complete_login = False
+
+if not "already_displayed_welcome_back" in st.session_state:
+    st.session_state.already_displayed_welcome_back = False
 
 if not "recommendation" in st.session_state:
     st.session_state.recommendation = True
@@ -36,6 +48,45 @@ st.caption("💻 문제를 묻거나 방법을 물어보세요!")
 st.caption("예쁜 자유 게시판 등록 같은 일도 할 수 있답니다!")
 st.info("사용자에게 로그인 요청 중...")
 
+@st.dialog("다시 오신 것을 환영합니다!")
+def welcome_back_popup():
+    st.write("저희의 AI를 사용해 주셔서 감사합니다.")
+    st.caption("현재 저장된 정보로 자동 로그인을 하였습니다.")
+    st.caption("만약 다른 계정으로 로그인하고 싶으시다면, 로그아웃 후 다시 시도해 주세요.")
+    st.button("확인")
+
+if username := cookies.get("username"):
+    password = cookies.get("password")
+    post_data = {"username": username, "password": password}
+    try:
+        req = st.session_state.current_session.post("https://43.200.211.173/api/login", data=post_data)
+        req_text = req.json()
+        
+        if "error" not in req_text or not req_text["error"]:
+            st.session_state.user_id = txtinput
+            print(f"automatically logged in: user={st.session_state.user_id}, pw={user_pw}, timestamp={datetime.now()}")
+            st.session_state.logged_in = True
+            st.session_state.recommendation = False
+            st.rerun()
+            cookies.set(
+                "username",
+                username,
+                datetime.now() + timedelta(days=1)
+            )
+            cookies.set(
+                "password",
+                password,
+                datetime.now() + timedelta(days=1)
+            )
+            st.success("자동 로그인이 되었습니다.")
+            if not st.session_state.already_displayed_welcome_back:
+                st.session_state.already_displayed_welcome_back = True
+                welcome_back_popup()
+        else:
+            st.error("자동 로그인 실패")
+    except Exception as e:
+        st.error(f"서버 연결 오류: {e}")
+
 @st.dialog("로그인", dismissible=False)
 def login_popup():
     st.write("저희의 AI를 사용하기 앞서 로그인이 필요합니다.")
@@ -44,23 +95,32 @@ def login_popup():
     
     with st.form("login_form"):
         txtinput = st.text_input("AJIT 사이트의 ID를 입력하세요")
-        if txtinput:
-            st.session_state.user_id = txtinput
         user_pw = st.text_input("AJIT 사이트의 비밀번호를 입력하세요", type="password")
         
         submit_clicked = st.form_submit_button("로그인")
         
         if submit_clicked:
-            post_data = {"username": st.session_state.user_id, "password": user_pw}
+            post_data = {"username": txtinput, "password": user_pw}
             try:
                 req = st.session_state.current_session.post("https://43.200.211.173/api/login", data=post_data)
                 req_text = req.json()
                 
                 if "error" not in req_text or not req_text["error"]:
-                    print(f"logged in: user={st.session_state.user_id}, pw={user_pw}, timestamp={datetime.datetime.now()}")
+                    st.session_state.user_id = txtinput
+                    print(f"logged in: user={st.session_state.user_id}, pw={user_pw}, timestamp={datetime.now()}")
                     st.session_state.logged_in = True
                     st.session_state.recommendation = False
                     st.rerun()
+                    cookies.set(
+                        "username",
+                        st.session_state.user_id,
+                        datetime.now() + timedelta(days=1)
+                    )
+                    cookies.set(
+                        "password",
+                        user_pw,
+                        datetime.now() + timedelta(days=1)
+                    )
                 else:
                     st.toast("ID 또는 비밀번호가 잘못되었습니다.")
             except Exception as e:
@@ -232,6 +292,7 @@ async def start_agent_streaming(agent_executor, chat_history, user_input) -> str
         if kind == "on_chat_model_stream":
             if not full_response:
                 status.update(label="에이전트가 답변을 생성하는 중...", state="running")
+                status.write("🪄 답변 생성 중...")
             content = event["data"]["chunk"].content
             if content:
                 full_response += content
