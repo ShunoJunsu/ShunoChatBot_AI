@@ -1,0 +1,86 @@
+import os
+import streamlit as st
+import langchain
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.tools import tool
+from langchain_community.callbacks.streamlit import StreamlitCallbackHandler
+from langchain_core.messages import AIMessage, HumanMessage
+import requests
+
+if not "chat_history" in st.session_state:
+    st.session_state.chat_history = []
+
+if not "user_login_session" in st.session_state:
+    st.session_state.user_login_session = requests.Session()
+
+os.environ["GOOGLE_API_KEY"] = st.secrets["GOOGLE_AI_API_KEY"]
+
+st.set_page_config(
+    page_title = "IM4U 코딩 비서",
+    page_icon = ":computer:",
+    layout = "wide"
+)
+
+def find_string(query: str, dest: str) -> bool:
+    parts = [p.strip() for p in query.split()]
+    return all(part in dest for dest in parts)
+
+@tool
+def find_normal_problem(query: str) -> str:
+    """
+    일반 문제를 찾는 함수입니다.
+    """
+    try:
+        res = requests.get(f"https://43.200.211.173/api/problem?paging=true&offset=0&limit=1&keyword={query}&page=1", timeout=5)
+        res_json = res.json()
+        if (len(res_json["data"]["results"]) < 1):
+            return "문제가 존재하지 않습니다. 문제의 철자가 맞는지, 클래스 문제와 혼동한 것은 아닌지 확인해 주세요."
+        else:
+            result = res_json["data"]["results"][0]
+            return_str = f"문제 이름: {result["title"]}\n\n=== 문제 내용 ===\n{result["description"]}\n\n=== 프로그램 입력값 ===\n{result["input_description"]}\n\n=== 프로그램 출력값 ===\n{result["output_description"]}\n\n시간 제한: {result["time_limit"]}ms\n메모리 제한: {result["memory_limit"]}MB\n총 제출 수: {result["submission_number"]}\n총 맞춘 수: {result["accepted_number"]}"
+            for i, sample in enumerate(result["samples"]):
+                return_str.append(f"\n\n=== 예제 {i} ===\n예제 입력: '{sample["input"]}'\n예제 출력: '{sample["output"]}'")
+            return return_str
+    except:
+        return "문제 검색에 실패하였습니다. 네트워크 연결 상태를 확인해 주세요."
+    
+@tool
+def find_class_problem(query: str) -> str:
+    """
+    클래스 문제를 찾는 함수입니다.
+    대부분의 경우, 로그인이 필요할 수 있습니다.
+    """
+    try:
+        if "user_login_session" in st.session_state:
+            res = st.session_state.user_login_session.get("", timeout=5)
+            return_str = f""
+            return return_str
+        else:
+            return "로그인이 되어 있지 않아 클래스 문제를 불러올 수 없습니다. 로그인 후 다시 시도해 주세요."
+    except:
+        return "문제 검색에 실패하였습니다. 네트워크 연결 상태를 확인해 주세요."
+
+tools = [find_normal_problem, find_class_problem]
+
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1, streaming=True)
+
+prompt = ChatPromptTemplate.from_messages([
+    ("system", "당신은 im4u라는 코딩 학원의 학생의 개인 코딩 비서입니다. 만약 문제, 클래스 문제 찾기, 자유게시판 등록/삭제 등 학원 사이트에 밀접한 일 같은 당신이 독자적으로 할 수 없는 일일 경우에 Tool을 사용하세요."),
+    ("human", "{input}"),
+    MessagesPlaceholder(variable_name="agent_scratchpad"),
+    MessagesPlaceholder(variable_name="chat_history")
+])
+
+agent = create_tool_calling_agent(llm, tools, prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+
+if user_input := st.chat_input("무엇이든 물어보세요..."):
+    st_callback = StreamlitCallbackHandler(st.container())
+    with st.chat_message("user"):
+        st.write(user_input)
+    with st.chat_message("assistant"):
+        response = agent_executor.invoke({"input": user_input}, {"callbacks": [st_callback]})
+        st.markdown(response["output"])
+        st.session_state.chat_history.append(AIMessage(response["output"]))
