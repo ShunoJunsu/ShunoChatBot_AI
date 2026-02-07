@@ -220,15 +220,24 @@ for msg in st.session_state.chat_history:
         st.markdown(msg_dict["content"])
 
 async def start_agent_streaming(agent_executor, chat_history, user_input) -> str:
-    with st.status("에이전트가 답변을 생성하기 시작하는 중...", expanded=True) as status:
-            full_response = ""
-            container = st.empty()
-            async for event in agent_executor.astream_events(
-                {"input": user_input, "chat_history": chat_history},
-                version="v2"
-            ):
-                kind = event["event"]
+    status = st.status("에이전트가 답변을 생성하기 시작하는 중...", expanded=True)
+    full_response = ""
+    container = st.empty()
+    async for event in agent_executor.astream_events(
+        {"input": user_input, "chat_history": chat_history},
+        version="v2"
+    ):
+        kind = event["event"]
 
+        if kind == "on_chat_model_stream":
+            if not full_response:
+                status.update(label="에이전트가 답변을 생성하는 중...", state="running")
+            content = event["data"]["chunk"].content
+            if content:
+                full_response += content
+                container.markdown(full_response + "▌")
+        else:
+            with status:
                 if kind == "on_tool_start":
                     status.update(label="에이전트가 도구를 사용하는 중...", state="running")
                     name = ""
@@ -252,17 +261,10 @@ async def start_agent_streaming(agent_executor, chat_history, user_input) -> str
                     elif event["name"] == "create_board":
                         name = "게시판 등록 완료"
                     status.write(f"✅ {name}!")
-                elif kind == "on_chat_model_stream":
-                    if not full_response:
-                        status.update(label="에이전트가 답변을 생성하는 중...", state="running")
-                    content = event["data"]["chunk"].content
-                    if content:
-                        full_response += content
-                        container.markdown(full_response + "▌")
 
-            status.update(label="에이전트가 답변을 생성함", state="complete", expanded=False)
-            container.markdown(full_response)
-            return full_response
+    status.update(label="에이전트가 답변을 생성함", state="complete", expanded=False)
+    container.markdown(full_response)
+    return full_response
 
 user_input = st.chat_input("무엇이든 물어보세요... (예: 월급받는 권종구 문제 알려줘)")
 if user_input:
