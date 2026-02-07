@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from streamlit_cookies_manager import EncryptedCookieManager
+import extra_streamlit_components as stx
 from datetime import datetime, timedelta
 import os
 import urllib3
@@ -19,13 +19,7 @@ st.set_page_config(
     layout="wide"
 )
 
-cookies = EncryptedCookieManager(
-    prefix="myapp_",
-    password="ShunoChatBot_IM4U1234!"
-)
-
-if not cookies.ready():
-    st.rerun()
+cookie_manager = stx.CookieManager()
 
 if not "already_displayed_complete_login" in st.session_state:
     st.session_state.already_displayed_complete_login = False
@@ -55,37 +49,37 @@ def welcome_back_popup():
     st.caption("만약 다른 계정으로 로그인하고 싶으시다면, 로그아웃 후 다시 시도해 주세요.")
     st.button("확인")
 
-if username := cookies.get("username"):
-    password = cookies.get("password")
-    post_data = {"username": username, "password": password}
-    try:
-        req = st.session_state.current_session.post("https://43.200.211.173/api/login", data=post_data)
-        req_text = req.json()
-        
-        if "error" not in req_text or not req_text["error"]:
-            st.session_state.user_id = txtinput
-            print(f"automatically logged in: user={st.session_state.user_id}, pw={user_pw}, timestamp={datetime.now()}")
-            st.session_state.logged_in = True
-            st.session_state.recommendation = False
-            st.rerun()
-            cookies.set(
-                "username",
-                username,
-                datetime.now() + timedelta(days=1)
-            )
-            cookies.set(
-                "password",
-                password,
-                datetime.now() + timedelta(days=1)
-            )
-            st.success("자동 로그인이 되었습니다.")
-            if not st.session_state.already_displayed_welcome_back:
-                st.session_state.already_displayed_welcome_back = True
-                welcome_back_popup()
-        else:
-            st.error("자동 로그인 실패")
-    except Exception as e:
-        st.error(f"서버 연결 오류: {e}")
+if username := cookie_manager.get(cookie="username"):
+    if password := cookie_manager.get(cookie="password"):
+        post_data = {"username": username, "password": password}
+        try:
+            req = st.session_state.current_session.post("https://43.200.211.173/api/login", data=post_data)
+            req_text = req.json()
+            
+            if "error" not in req_text or not req_text["error"]:
+                st.session_state.user_id = username
+                print(f"automatically logged in: user={st.session_state.user_id}, pw={user_pw}, timestamp={datetime.now()}")
+                st.session_state.logged_in = True
+                st.session_state.recommendation = False
+                st.rerun()
+                cookie_manager.set(
+                    cookie="username",
+                    val=username,
+                    expires_at=datetime.now() + timedelta(days=1)
+                )
+                cookie_manager.set(
+                    cookie="password",
+                    val=password,
+                    expires_at=datetime.now() + timedelta(days=1)
+                )
+                st.success("자동 로그인이 되었습니다.")
+                if not st.session_state.already_displayed_welcome_back:
+                    st.session_state.already_displayed_welcome_back = True
+                    welcome_back_popup()
+            else:
+                st.error("자동 로그인 실패")
+        except Exception as e:
+            st.error(f"서버 연결 오류: {e}")
 
 @st.dialog("로그인", dismissible=False)
 def login_popup():
