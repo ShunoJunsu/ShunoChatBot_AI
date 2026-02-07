@@ -105,15 +105,15 @@ def login_popup():
                     st.session_state.logged_in = True
                     st.session_state.recommendation = False
                     st.rerun()
-                    cookies.set(
-                        "username",
-                        st.session_state.user_id,
-                        datetime.now() + timedelta(days=1)
+                    cookie_manager.set(
+                        cookie="username",
+                        val=st.session_state.user_id,
+                        expires_at=datetime.now() + timedelta(days=1)
                     )
-                    cookies.set(
-                        "password",
-                        user_pw,
-                        datetime.now() + timedelta(days=1)
+                    cookie_manager.set(
+                        cookie="password",
+                        val=user_pw,
+                        expires_at=datetime.now() + timedelta(days=1)
                     )
                 else:
                     st.toast("ID 또는 비밀번호가 잘못되었습니다.")
