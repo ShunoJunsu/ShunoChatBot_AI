@@ -1,6 +1,6 @@
 from langchain_openai import ChatOpenAI
 from langchain.tools import tool
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.agents import create_openai_tools_agent
 from langchain.agents import AgentExecutor
 import streamlit as st
