@@ -5,3 +5,4 @@ langchain-google-genai>=1.0.0
 langchain-community>=0.2.0
 langchain-core>=0.2.0
 urllib3<2.0.0
+pkg_resources
