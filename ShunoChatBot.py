@@ -5,7 +5,7 @@ import os
 import urllib3
 from langchain_openai import ChatOpenAI
 from langchain.tools import tool
-from langchain.agents import AgentExecutor, create_openai_tools_agent
+from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -197,7 +197,7 @@ prompt = ChatPromptTemplate.from_messages([
 ])
 
 tools = [search_problem_db, search_contest_db, create_board, check_ranking]
-agent = create_openai_tools_agent(
+agent = create_tool_calling_agent(
     llm = llm,
     tools=tools,
     prompt=prompt
