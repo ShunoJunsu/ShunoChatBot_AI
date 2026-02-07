@@ -1,3 +1,7 @@
+import pkg_resources
+installed_packages = [f"{d.project_name}=={d.version}" for d in pkg_resources.working_set]
+st.write(installed_packages)
+
 import streamlit as st
 import requests
 import datetime
