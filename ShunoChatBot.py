@@ -5,7 +5,8 @@ import os
 import urllib3
 from langchain_openai import ChatOpenAI
 from langchain.tools import tool
-from langchain.agents.agent import AgentExecutor, create_tool_calling_agent
+from langchain.agents.agent import AgentExecutor
+from langchain.agents import create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
