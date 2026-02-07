@@ -1,7 +1,3 @@
-import pkg_resources
-installed_packages = [f"{d.project_name}=={d.version}" for d in pkg_resources.working_set]
-st.write(installed_packages)
-
 import streamlit as st
 import requests
 import datetime
@@ -9,7 +5,7 @@ import os
 import urllib3
 from langchain_openai import ChatOpenAI
 from langchain.tools import tool
-from langchain.agents import AgentExecutor, create_tool_calling_agent
+from langchain.agents.agent import AgentExecutor, create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
