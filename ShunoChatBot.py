@@ -1,3 +1,4 @@
+from functools import wraps
 import streamlit as st
 import requests
 import extra_streamlit_components as stx
@@ -20,7 +21,21 @@ st.set_page_config(
     layout="wide"
 )
 
-ctx = get_script_run_ctx()
+main_ctx = get_script_run_ctx()
+
+def with_streamlit_context(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        add_script_run_ctx(ctx=main_ctx)
+        return func(*args, **kwargs)
+    return wrapper
+
+def with_async_streamlit_context(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        add_script_run_ctx(ctx=main_ctx)
+        return await func(*args, **kwargs)
+    return wrapper
 
 cookie_manager = stx.CookieManager()
 
@@ -148,6 +163,7 @@ def search_string(param: str, dest: str) -> bool:
     return all(word in dest.lower() for word in param.strip().lower().split())
 
 @tool
+@with_streamlit_context
 def check_ranking(username: str) -> int:
     """
     특정 사용자에 대한 랭킹을 검색합니다.
@@ -168,6 +184,7 @@ def check_ranking(username: str) -> int:
         return "문제가 발생하여 랭킹을 검색하지 못했습니다. 네트워크 연결 상태를 확인해 주세요."
 
 @tool
+@with_streamlit_context
 def create_board(title: str, detail: str) -> str:
     """
     게시판을 등록합니다.
@@ -191,6 +208,7 @@ def create_board(title: str, detail: str) -> str:
         return "문제가 발생하여 게시판을 등록하지 못했습니다. 네트워크 연결 상태를 확인해 주세요."
 
 @tool
+@with_streamlit_context
 def search_problem_db(query: str) -> str:
     """
     문제를 검색한다.
@@ -209,6 +227,7 @@ def search_problem_db(query: str) -> str:
         return "문제가 발생하여 문제 정보를 가져오지 못했습니다. 네트워크 연결 상태를 확인해 주세요."
 
 @tool
+@with_streamlit_context
 def search_contest_db(query: str) -> str:
     """
     클래스에 있는 문제를 검색한다.
@@ -277,6 +296,7 @@ for msg in st.session_state.chat_history:
     with st.chat_message(msg_dict["type"]):
         st.markdown(msg_dict["content"])
 
+@with_async_streamlit_context
 async def start_agent_streaming(agent_executor, chat_history, user_input) -> str:
     add_script_run_ctx(ctx=ctx)
 
