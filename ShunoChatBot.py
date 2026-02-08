@@ -213,6 +213,11 @@ def search_contest_db(query: str, config: RunnableConfig) -> str:
     """
     클래스에 있는 문제를 검색한다.
     """
+
+    conf_data = config.get("configurable", {})
+    st.write(f"DEBUG - Config data keys: {list(conf_data.keys())}")
+    st.write(f"DEBUG - Session object: {conf_data.get('current_session')}")
+
     if not config.get("configurable", {}).get("logged_in", False):
         return "로그인이 되어 있지 않아 클래스 문제를 가져올 수 없습니다. 로그인을 하여 클래스 문제를 가져오세요."
     try:
