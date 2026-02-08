@@ -12,30 +12,14 @@ from langchain_classic.agents import AgentExecutor
 from langchain_classic.agents import create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.runnables import RunnableConfig
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-from streamlit.runtime.scriptrunner import get_script_run_ctx, add_script_run_ctx
 
 st.set_page_config(
     page_title="IM4U 코딩 비서",
     page_icon="💻",
     layout="wide"
 )
-
-main_ctx = get_script_run_ctx()
-
-def with_streamlit_context(func):
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        add_script_run_ctx(ctx=main_ctx)
-        return func(*args, **kwargs)
-    return wrapper
-
-def with_async_streamlit_context(func):
-    @wraps(func)
-    async def wrapper(*args, **kwargs):
-        add_script_run_ctx(ctx=main_ctx)
-        return await func(*args, **kwargs)
-    return wrapper
 
 cookie_manager = stx.CookieManager()
 
@@ -163,19 +147,19 @@ def search_string(param: str, dest: str) -> bool:
     return all(word in dest.lower() for word in param.strip().lower().split())
 
 @tool
-@with_streamlit_context
-def check_ranking(username: str) -> int:
+def check_ranking(username: str, config: RunnableConfig) -> int:
     """
     특정 사용자에 대한 랭킹을 검색합니다.
     'Me'는 지금 사용자를 의미합니다.
     """
+
     try:
         if username.strip().lower() == "me":
-            if not "user_id" in st.session_state:
+            if not config.get("configurable", {}).get("logged_in", False):
                 return "지금 로그인이 되어 있지 않아 사용자가 누구인지 특정할 수 없습니다. 로그인 한 뒤 다시 시도해 주세요."
             else:
-                username = st.session_state.user_id
-        res = st.session_state.current_session.get("https://43.200.211.173/api/user_rank/single?username=" + username)
+                username = config.get("configurable", {}).get("user_id", None)
+        res = requests.get("https://43.200.211.173/api/user_rank/single?username=" + username, verify=False, timeout=5)
         res_json = res.json()
         if res_json["data"]["rank"] == 0:
             return "해당 사용자의 랭킹이 존재하지 않습니다. 랭킹이 매우 낮거나 존재하지 않는 계정일 수 있습니다."
@@ -184,8 +168,7 @@ def check_ranking(username: str) -> int:
         return "문제가 발생하여 랭킹을 검색하지 못했습니다. 네트워크 연결 상태를 확인해 주세요."
 
 @tool
-@with_streamlit_context
-def create_board(title: str, detail: str) -> str:
+def create_board(title: str, detail: str, config: RunnableConfig) -> str:
     """
     게시판을 등록합니다.
     게시판은 HTML 형식으로 등록하고 태그는 p, a, h1, h2, h3, h4, h5, h6, code, img만 사용 가능하고
@@ -193,7 +176,7 @@ def create_board(title: str, detail: str) -> str:
     title에는 제목 (Plain Text),
     detail에는 본문 (HTML) 이 들어갑니다.
     """
-    if not st.session_state.logged_in:
+    if not config.get("configurable", {}).get("logged_in", False):
         return "게시판을 등록하려면 로그인이 되어 있어야 합니다. 로그인을 하여 더 많은 기능에 접근해 보세요."
     try:
         post_ready = {
@@ -201,20 +184,19 @@ def create_board(title: str, detail: str) -> str:
             "content": "<h6>//이 글은 AI 비서에 의해 제작되었습니다.//</h6>" + detail,
             "visible": "true"
         }
-        res = st.session_state.current_session.post("https://43.200.211.173/api/board", post_ready)
+        res = config.get("configurable", {}).get("current_session", None).post("https://43.200.211.173/api/board", post_ready)
         res.raise_for_status()
         return "성공적으로 등록되었습니다."
     except Exception:
         return "문제가 발생하여 게시판을 등록하지 못했습니다. 네트워크 연결 상태를 확인해 주세요."
 
 @tool
-@with_streamlit_context
-def search_problem_db(query: str) -> str:
+def search_problem_db(query: str, config: RunnableConfig) -> str:
     """
     문제를 검색한다.
     """
     try:
-        res = st.session_state.current_session.get(f"https://43.200.211.173/api/problem?paging=true&offset=0&limit=10&keyword={query}&page=1", timeout=5, verify=False)
+        res = requests.get(f"https://43.200.211.173/api/problem?paging=true&offset=0&limit=10&keyword={query}&page=1", timeout=5, verify=False)
         res.raise_for_status()
         resjson = res.json()
         if not resjson["data"]["results"][0]:
@@ -227,20 +209,20 @@ def search_problem_db(query: str) -> str:
         return "문제가 발생하여 문제 정보를 가져오지 못했습니다. 네트워크 연결 상태를 확인해 주세요."
 
 @tool
-@with_streamlit_context
-def search_contest_db(query: str) -> str:
+def search_contest_db(query: str, config: RunnableConfig) -> str:
     """
     클래스에 있는 문제를 검색한다.
     """
-    if not st.session_state.logged_in:
+    if not config.get("configurable", {}).get("logged_in", False):
         return "로그인이 되어 있지 않아 클래스 문제를 가져올 수 없습니다. 로그인을 하여 클래스 문제를 가져오세요."
     try:
-        res = st.session_state.current_session.get("https://43.200.211.173/api/contests?offset=0&limit=30", timeout=5, verify=False)
+        current_session = config.get("configurable", {}).get("current_session", None)
+        res = current_session.get("https://43.200.211.173/api/contests?offset=0&limit=30", timeout=5, verify=False)
         res.raise_for_status()
         res_json = res.json()
         result = "문제를 찾지 못했습니다. 문제의 철자가 맞는지, 문제가 존재하는지 확인해 주세요."
         for contest in res_json["data"]["results"]:
-            res_second = st.session_state.current_session.get(f"https://43.200.211.173/api/contest/problem?contest_id={contest['id']}&paging=true&offset=0&limit=30", timeout=5, verify=False)
+            res_second = current_session.get(f"https://43.200.211.173/api/contest/problem?contest_id={contest['id']}&paging=true&offset=0&limit=30", timeout=5, verify=False)
             res_second.raise_for_status()
             res_second_json = res_second.json()
             brake = False
@@ -296,16 +278,21 @@ for msg in st.session_state.chat_history:
     with st.chat_message(msg_dict["type"]):
         st.markdown(msg_dict["content"])
 
-@with_async_streamlit_context
 async def start_agent_streaming(agent_executor, chat_history, user_input) -> str:
-    add_script_run_ctx(ctx=ctx)
-
     status = st.status("에이전트가 답변을 생성하기 시작하는 중...", expanded=True)
     full_response = ""
     already_displayed = False
     container = st.empty()
+
+    SESSION_COPY = {
+        "logged_in": st.session_state.get("logged_in", None),
+        "current_session": st.session_state.get("current_session", None),
+        "user_id": st.session_state.get("user_id", None)
+    }
+
     async for event in agent_executor.astream_events(
         {"input": user_input, "chat_history": chat_history},
+        config={"configurable": SESSION_COPY},
         version="v2"
     ):
         kind = event["event"]
