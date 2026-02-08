@@ -12,12 +12,15 @@ from langchain_classic.agents import create_tool_calling_agent
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
 from langchain_core.messages import HumanMessage, AIMessage
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+from streamlit.runtime.scriptrunner import get_script_run_ctx, add_script_run_ctx
 
 st.set_page_config(
     page_title="IM4U 코딩 비서",
     page_icon="💻",
     layout="wide"
 )
+
+ctx = get_script_run_ctx()
 
 cookie_manager = stx.CookieManager()
 
@@ -29,6 +32,7 @@ if not "already_displayed_welcome_back" in st.session_state:
 
 if not "recommendation" in st.session_state:
     st.session_state.recommendation = True
+    
 if not "logged_in" in st.session_state:
     st.session_state.logged_in = False
 
@@ -274,8 +278,11 @@ for msg in st.session_state.chat_history:
         st.markdown(msg_dict["content"])
 
 async def start_agent_streaming(agent_executor, chat_history, user_input) -> str:
+    add_script_run_ctx(ctx=ctx)
+
     status = st.status("에이전트가 답변을 생성하기 시작하는 중...", expanded=True)
     full_response = ""
+    already_displayed = False
     container = st.empty()
     async for event in agent_executor.astream_events(
         {"input": user_input, "chat_history": chat_history},
@@ -284,9 +291,10 @@ async def start_agent_streaming(agent_executor, chat_history, user_input) -> str
         kind = event["event"]
 
         if kind == "on_chat_model_stream":
-            if not full_response:
+            if not already_displayed:
                 status.update(label="에이전트가 답변을 생성하는 중...", state="running")
                 status.write("🪄 답변 생성 중...")
+                already_displayed = True
             content = event["data"]["chunk"].content
             if content:
                 full_response += content
